@@ -26,7 +26,7 @@ Build OnePlus latest kernel for your device with KSUN/WildKSU/KSU + SusFS anytim
 | OP-ACE-3V | |✅|✅|
 | OP-ACE-3 | |✅|✅|
 | OP-ACE-2-PRO | |✅|✅|
-| OP-ACE-2 | |✅| |
+| OP-ACE-2 | |✅|✅|
 | OP-OPEN | |✅|✅|
 | OP-PAD-3 | |✅|✅|
 | OP-PAD-2-PRO | |✅|✅|
