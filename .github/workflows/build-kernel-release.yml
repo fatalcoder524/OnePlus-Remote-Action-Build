@@ -21,6 +21,7 @@ on:
           - OP12_oos16
           - OP12r_oos16
           - OP11_oos16
+          - OP11r_oos16
           - OP-ACE-6T_oos16
           - OP-ACE-6_oos16
           - OP-ACE-5-PRO_oos16
