@@ -132,54 +132,65 @@ jobs:
         run: |
           set -euo pipefail
           echo "::group::Matrix generation"
-          
           input="${{ github.event.inputs.op_model }}"
           ksu_options_raw='${{ github.event.inputs.ksu_options }}'
+          
           if ! ksu_options_normalized=$(echo "$ksu_options_raw" | jq -c 'map(if .type then .type |= ascii_upcase | if .hash == null then if .type == "KSUN" then .hash = "dev" elif .type == "KSU" then .hash = "main" else .hash end else . end else error("No type found") end)' 2>&1); then
             echo "::error::ksu_options validation failed: $ksu_options_normalized"
             exit 1
           fi
           
+          model_part="${input%_*}"
+          os_part="${input##*_}"
+          case "$os_part" in
+            oos14) config_dir="configs/oos14" ;;
+            oos15) config_dir="configs/oos15" ;;
+            oos16) config_dir="configs/oos16" ;;
+            *) echo "::error::Unknown OS part: $os_part"; exit 1 ;;
+          esac
+          
+          if [[ ! -d "$config_dir" ]]; then
+              echo "::error::Config directory does not exist: $config_dir"
+              exit 1
+          fi
+          
+          mapfile -t all_json_files < <(find "$config_dir/" -name "$model_part.json" -print0 2>/dev/null | xargs -0 -n1)
+          
+          if [[ ${#all_json_files[@]} -eq 0 ]]; then
+              echo "::error::No config file found for model '$model_part' in '$config_dir/'"
+              exit 1
+          fi
+          
           echo "[" > matrix.json
-          mapfile -t all_json_files < <(find configs/ -name "*.json" -print0 | xargs -0 -n1)
           for i in "${!all_json_files[@]}"; do
-            file="${all_json_files[$i]}"
-            if [ -f "$file" ]; then
-              jq -r '.' "$file" >> matrix.json
-              if [ $((i+1)) -lt ${#all_json_files[@]} ]; then
-                echo "," >> matrix.json
+              file="${all_json_files[$i]}"
+              if [ -f "$file" ]; then
+                  jq -r '.' "$file" >> matrix.json
+                  if [ $((i+1)) -lt ${#all_json_files[@]} ]; then
+                      echo "," >> matrix.json
+                  fi
               fi
-            fi
           done
           echo "]" >> matrix.json
           
-          model_part="${input%_*}"
-          os_part="${input##*_}"
-          
           os_version=$(echo "$os_part" | tr '[:lower:]' '[:upper:]')
-          
           echo "🔍 Parsing input: $input"
           echo "   Model part: $model_part"
           echo "   OS part: $os_version"
+          echo "   Config dir: $config_dir"
           
           jq_filter="map(select(.model == \"$model_part\" and .os_version == \"$os_version\"))"
-          
           filtered=$(jq -c "$jq_filter" matrix.json)
           count=$(jq 'length' <<<"$filtered")
           
           if [ "$count" -eq 0 ]; then
-            echo "::error::No config files found for model '$model_part' with OS version '$os_version'!"
-            echo ""
-            echo "Available configurations:"
-            jq -r '.[] | "  - \(.model)_\(.os_version | ascii_downcase) (\(.os_version), \(.android_version)-\(.kernel_version))"' matrix.json
-            exit 1
+              echo "::error::No config files found for model '$model_part' with OS version '$os_version' in '$config_dir'!"
+              exit 1
           fi
           
-          # For each device + each ksu option → one combined entry
           merged_matrix=$(jq -n --argjson devices "$filtered" --argjson ksu_list "$ksu_options_normalized" '[ $devices[] as $dev | $ksu_list[] as $ksu | ($dev + {ksu_type: $ksu.type, ksu_hash: $ksu.hash}) ]')
           
           final_count=$(echo "$merged_matrix" | jq -s length)
-          
           wrapped=$(jq -n --argjson items "$merged_matrix" '{ include: $items }')
           
           echo "✅ Found $final_count device(s) to build"
@@ -189,7 +200,6 @@ jobs:
           
           echo "matrix=$(jq -c . <<< "$wrapped")" >> "$GITHUB_OUTPUT"
           echo "count=$count" >> "$GITHUB_OUTPUT"
-          
           echo "::endgroup::"
 
       - name: Upload build matrix
