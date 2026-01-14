@@ -26,17 +26,21 @@ on:
           - OP-ACE-6_oos16
           - OP-ACE-5-PRO_oos16
           - OP-ACE-5_oos16
+          - OP-ACE-5-ULTRA_oos16
+          - OP-ACE-5-RACE_oos16
           - OP-ACE-3-PRO_oos16
           - OP-ACE-3V_oos16
           - OP-ACE-3_oos16
           - OP-ACE-2-PRO_oos16
           - OP-ACE-2_oos16
           - OP-NORD-5_oos16
+          - OP-NORD-CE-5_oos16
           - OP-NORD-4_oos16
           - OP-NORD-4-CE_oos16
-          - OP-PAD-3_oos16
+          - OP-PAD-3-SM8750_oos16
           - OP-PAD-2-PRO_oos16
-          - OP-PAD-2_oos16
+          - OP-PAD-2-MT6991_oos16
+          - OP-PAD-2-SM8650_oos16
           - OP-PAD-PRO_oos16
           - OP-OPEN_oos16
           # OOS15
@@ -51,28 +55,42 @@ on:
           - OP11r_oos15
           - OP10t_oos15
           - OP10pro_oos15
+          - OP10r_oos15
           - OP-ACE-5-PRO_oos15
           - OP-ACE-5_oos15
+          - OP-ACE-5-ULTRA_oos15
+          - OP-ACE-5-RACE_oos15
           - OP-ACE-3-PRO_oos15
           - OP-ACE-3V_oos15
           - OP-ACE-3_oos15
           - OP-ACE-2-PRO_oos15
+          - OP-ACE-2V_oos15
           - OP-ACE-2_oos15
+          - OP-ACE-RACE_oos15
+          - OP-ACE_oos15
           - OP-NORD-5_oos15
+          - OP-NORD-CE-5_oos15
           - OP-NORD-4_oos15
           - OP-NORD-4-CE_oos15
           - OP-NORD-CE4-LITE_oos15
-          - OP-PAD-3_oos15
+          - OP-NORD-3_oos15
+          - OP-PAD-3-SM8750_oos15
+          - OP-PAD-3-MT6897_oos15
           - OP-PAD-2-PRO_oos15
-          - OP-PAD-2_oos15
+          - OP-PAD-2-SM8650_oos15
           - OP-PAD-PRO_oos15
+          - OP-PAD-MT6983_oos15
+          - OP-PAD-LITE_oos15
           - OP-OPEN_oos15
           # OOS14
           - OP12_oos14
           - OP11_oos14
           - OP11r_oos14
           - OP10pro_oos14
+          - OP10r_oos14
           - OP-ACE-3-PRO_oos14
+          - OP-ACE-RACE_oos14
+          - OP-ACE_oos14
           - OP-PAD-PRO_oos14
         default: OP11_oos16
       ksu_options:
