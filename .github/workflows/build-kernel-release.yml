@@ -13,6 +13,7 @@ on:
         type: choice
         options:
           # OOS16
+          - OP15r_oos16
           - OP15_oos16
           - OP13_oos16
           - OP13r_oos16
