@@ -3,6 +3,7 @@ Build OnePlus latest kernel for your device with KSUN/WildKSU/KSU + SusFS anytim
 # Devices list
 | Devices | OOS14 | OOS15 | OOS16 |
 | :--- | :---: | :---: | :---: |
+| OP15r | | |✅|
 | OP15 | | |✅|
 | OP13 | | |✅|
 | OP13-CPH | |✅| |
