@@ -45,5 +45,5 @@ Build OnePlus latest kernel for your device with KSUN/WildKSU/KSU + SusFS anytim
 | OP-PAD-2-SM8650 | |✅|✅|
 | OP-PAD-2-MT6991 | | |✅|
 | OP-PAD-PRO |✅|✅|✅|
-| OP-PAD-MT6983 | |✅| |
+| OP-PAD-MT6983 | |✅|✅|
 | OP-PAD-LITE | |✅| |
