@@ -43,6 +43,7 @@ on:
           - OP-PAD-2-MT6991_oos16
           - OP-PAD-2-SM8650_oos16
           - OP-PAD-PRO_oos16
+          - OP-PAD-MT6983_oos16
           - OP-OPEN_oos16
           # OOS15
           - OP13-CPH_oos15
