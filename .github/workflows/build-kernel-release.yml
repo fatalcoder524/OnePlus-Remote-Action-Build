@@ -44,6 +44,7 @@ on:
           - OP-PAD-2-SM8650_oos16
           - OP-PAD-PRO_oos16
           - OP-OPEN_oos16
+          - OP-PAD-GO-2_oos16
           # OOS15
           - OP13-CPH_oos15
           - OP13-PJZ_oos15
