@@ -15,7 +15,7 @@ Build OnePlus latest kernel for your device with KSUN/WildKSU/KSU + SusFS anytim
 | OP12r | |✅|✅|
 | OP11 |✅|✅|✅|
 | OP11r |✅|✅|✅|
-| OP10pro |✅|✅| |
+| OP10pro |✅|✅|✅|
 | OP10t | |✅| |
 | OP10r |✅|✅| |
 | OP-NORD-5 | |✅|✅|
