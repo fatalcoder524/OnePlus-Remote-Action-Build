@@ -229,7 +229,7 @@ jobs:
         with:
           name: build-matrix
           path: matrix.json
-          retention-days: 1
+          retention-days: 7
 
       - name: 📊 Build plan summary
         run: |
