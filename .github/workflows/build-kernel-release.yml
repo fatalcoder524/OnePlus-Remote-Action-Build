@@ -41,6 +41,7 @@ on:
           - OP-NORD-4-CE_oos16
           - OP-NORD-CE4-LITE_oos16
           - OP-PAD-3-SM8750_oos16
+          - OP-PAD-3-MT6897_oos16
           - OP-PAD-2-PRO_oos16
           - OP-PAD-2-MT6991_oos16
           - OP-PAD-2-SM8650_oos16
