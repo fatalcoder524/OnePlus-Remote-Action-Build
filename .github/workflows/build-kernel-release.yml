@@ -126,6 +126,9 @@ jobs:
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
       device_count: ${{ steps.set-matrix.outputs.count }}
+      ksu_resolved_hash:    ${{ steps.set-matrix.outputs.ksu_resolved_hash }}
+      ksu_options_normalized: ${{ steps.set-matrix.outputs.ksu_options_normalized }}
+      susfs_resolved_hash:  ${{ steps.set-matrix.outputs.susfs_resolved_hash }}
     steps:
       - name: 📥 Checkout Code (to access configs/)
         uses: actions/checkout@v6
@@ -138,6 +141,9 @@ jobs:
       - name: 🔍 Generate build matrix
         id: set-matrix
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_HTTP_TIMEOUT: 600
         run: |
           set -euo pipefail
           echo "::group::Matrix generation"
@@ -200,15 +206,142 @@ jobs:
           merged_matrix=$(jq -n --argjson devices "$filtered" --argjson ksu_list "$ksu_options_normalized" '[ $devices[] as $dev | $ksu_list[] as $ksu | ($dev + {ksu_type: $ksu.type, ksu_hash: $ksu.hash}) ]')
           
           final_count=$(echo "$merged_matrix" | jq -s length)
-          wrapped=$(jq -n --argjson items "$merged_matrix" '{ include: $items }')
           
           echo "✅ Found $final_count device(s) to build"
           echo ""
           echo "Selected devices:"
           jq -r '.[] | "  - \(.model) (\(.os_version), \(.android_version)-\(.kernel_version), \(.ksu_type) - \(.ksu_hash))"' <<<"$merged_matrix"
           
-          echo "matrix=$(jq -c . <<< "$wrapped")" >> "$GITHUB_OUTPUT"
           echo "count=$count" >> "$GITHUB_OUTPUT"
+          echo "ksu_options_normalized=$ksu_options_normalized" >> "$GITHUB_OUTPUT"
+          
+          ksu_type=$(echo "$ksu_options_normalized" | jq -r '.[0].type')
+          ksu_ref=$(echo "$ksu_options_normalized" | jq -r '.[0].hash')
+          
+          if [ "$ksu_type" == "KSUN" ]; then
+            KSU_REPO_OWNER="KernelSU-Next"
+            KSU_REPO_NAME="KernelSU-Next"
+          else
+            KSU_REPO_OWNER="tiann"
+            KSU_REPO_NAME="KernelSU"
+          fi
+          
+          HEAD_REF="refs/heads/${ksu_ref}"
+          TAG_REF="refs/tags/${ksu_ref}"
+          
+          QUERY='query($owner: String!, $name: String!, $headRef: String!, $tagRef: String!, $objRef: String!) {
+            repository(owner: $owner, name: $name) {
+              hb: ref(qualifiedName: $headRef) { t: target { ... on Commit { o: oid } } }
+              ht: ref(qualifiedName: $tagRef) { t: target { ... on Commit { o: oid } } }
+              ho: object(expression: $objRef) { ... on Commit { o: oid } }
+            }
+          }'
+          
+          MAX_RETRIES=3
+          RETRY_COUNT=0
+          RETRY_DELAY=5
+          
+          echo "Resolving $ksu_type hash ($ksu_ref)..."
+          
+          until [ $RETRY_COUNT -ge $MAX_RETRIES ]; do
+            RESULT=$(gh api graphql -f query="$QUERY" -f owner="$KSU_REPO_OWNER" -f name="$KSU_REPO_NAME" -f headRef="$HEAD_REF" -f tagRef="$TAG_REF" -f objRef="$ksu_ref" 2>/dev/null)
+            EXIT_CODE=$?
+            
+            if [ $EXIT_CODE -eq 0 ] && [ -n "$RESULT" ]; then
+              echo "  ✅ API Success"
+              break
+            fi
+            
+            RETRY_COUNT=$((RETRY_COUNT + 1))
+            echo "::warning::API failed (Attempt $RETRY_COUNT/$MAX_RETRIES). Retrying in ${RETRY_DELAY}s..."
+            sleep $RETRY_DELAY
+          done
+          
+          if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+            echo "::error::GitHub API unreachable. Cannot validate $ksu_ref"
+            exit 1
+          fi
+          
+          resolved_sha=$(echo "$RESULT" | jq -r '.data.repository | (.hb.t.o // .ht.t.o // .ho.o // "unknown")')
+          
+          if [ "$resolved_sha" == "unknown" ]; then
+            echo "::error::Ref/Hash '$ksu_ref' does not exist in $KSU_REPO_OWNER/$KSU_REPO_NAME"
+            exit 1
+          fi
+          
+          echo "  ✅ Resolved: $ksu_type/$ksu_ref → $resolved_sha"
+          echo "ksu_resolved_hash=$resolved_sha" >> "$GITHUB_OUTPUT"
+          
+          # Inject ksu_resolved_hash into matrix
+          merged_matrix=$(echo "$merged_matrix" | jq --arg resolved_sha "$resolved_sha" 'map(.ksu_resolved_hash = $resolved_sha)')
+          
+          # SUSFS hash fetch
+          SUSFS_REPO="https://gitlab.com/simonpunk/susfs4ksu.git"
+          PROJECT_ID="simonpunk%2fsusfs4ksu"
+          android_ver=$(echo "$merged_matrix" | jq -r '.[0].android_version')
+          kernel_ver=$(echo "$merged_matrix"  | jq -r '.[0].kernel_version')
+          susfs_key="${android_ver}-${kernel_ver}"
+          
+          declare -A default_branches=(
+            ["android12-5.10"]="gki-android12-5.10"
+            ["android13-5.15"]="gki-android13-5.15"
+            ["android14-6.1"]="gki-android14-6.1"
+            ["android15-6.6"]="gki-android15-6.6"
+            ["android16-6.12"]="gki-android16-6.12"
+          )
+          
+          user_val="${{ inputs.susfs_branch_or_commit }}"
+          default_val="${default_branches[$susfs_key]:-gki-android15-6.6}"
+          susfs_ref="${user_val:-$default_val}"
+          
+          susfs_enabled=$(echo "$merged_matrix" | jq -r '.[0].susfs')
+          
+          if [ "$susfs_enabled" = "true" ]; then
+            echo "🔍 Resolving SUSFS hash for: $susfs_key (ref: $susfs_ref)"
+            
+            MAX_RETRIES=3
+            RETRY_COUNT=0
+            RETRY_DELAY=5
+            susfs_resolved=""
+            
+            until [ $RETRY_COUNT -ge $MAX_RETRIES ]; do
+              # We query the commit endpoint which accepts Branch, Tag, or SHA
+              RESULT=$(curl -s --fail \
+                "https://gitlab.com/api/v4/projects/${PROJECT_ID}/repository/commits/${susfs_ref}")
+              EXIT_CODE=$?
+              
+              if [ $EXIT_CODE -eq 0 ] && [ -n "$RESULT" ]; then
+                susfs_resolved=$(echo "$RESULT" | jq -r '.id')
+                echo "  ✅ Resolved: $susfs_key → $susfs_resolved"
+                break
+              fi
+              
+              RETRY_COUNT=$((RETRY_COUNT + 1))
+              echo "::warning::GitLab API failed (Attempt $RETRY_COUNT/$MAX_RETRIES). Retrying..."
+              sleep $RETRY_DELAY
+            done
+            
+            # Final Validation
+            if [ -z "$susfs_resolved" ] || [ "$susfs_resolved" = "null" ]; then
+              echo "::error::Could not resolve SUSFS ref '$susfs_ref' for $susfs_key on GitLab."
+              exit 1
+            fi
+          else
+            susfs_resolved="unknown"
+            echo "ℹ️  SUSFS disabled for this device, skipping resolution"
+          fi
+          
+          echo "susfs_resolved_hash=$susfs_resolved" >> "$GITHUB_OUTPUT"
+          
+          # Inject susfs_resolved_hash into matrix
+          merged_matrix=$(echo "$merged_matrix" | jq \
+            --arg susfs_resolved "$susfs_resolved" \
+            'map(.susfs_resolved_hash = $susfs_resolved)')
+          
+          # Recalculate wrapped with updated matrix and write output
+          wrapped=$(jq -n --argjson items "$merged_matrix" '{ include: $items }')
+          echo "matrix=$(jq -c . <<< "$wrapped")" >> "$GITHUB_OUTPUT"
+          
           echo "::endgroup::"
 
       - name: Upload build matrix
@@ -221,24 +354,18 @@ jobs:
 
       - name: 📊 Build plan summary
         run: |
-          ksu_options_raw='${{ github.event.inputs.ksu_options }}'
-          ksu_options_normalized=$(echo "$ksu_options_raw" | jq -c 'map(if .type then .type |= ascii_upcase | if .hash == null then if .type == "KSUN" then .hash = "dev" elif .type == "KSU" then .hash = "main" else .hash end else . end else error("No type found") end)' 2>&1)
+          ksu_type="${{ fromJSON(steps.set-matrix.outputs.ksu_options_normalized)[0].type }}"
+          ksu_ref="${{ fromJSON(steps.set-matrix.outputs.ksu_options_normalized)[0].hash }}"
+          ksu_resolved="${{ steps.set-matrix.outputs.ksu_resolved_hash }}"
           
-          # export KSU_OPTIONS="$ksu_options_normalized"
-          
-          # cat >> $GITHUB_STEP_SUMMARY << 'EOF'
-          # ## 🎯 Build Plan
-          
-          # **Target:** `${{ inputs.op_model }}`  
-          # **Devices:** ${{ steps.set-matrix.outputs.count }}  
-          
-          # **Configuration:**
-          # - KSU Config: `"$KSU_OPTIONS"`
-          # - Optimization: `${{ inputs.optimize_level }}`
-          # - Clean Build/No Ccache: ${{ inputs.clean_build && '✅ Yes' || '❌ No' }}
-          
-          # **SUSFS Configuration:**
-          # EOF
+          ksu_display=""
+          if [ "$ksu_type" = "KSUN" ] || [ "$ksu_type" = "KSU" ]; then
+            if [[ "$ksu_ref" =~ ^[0-9a-f]{40}$ ]]; then
+              ksu_display+="📌 \`$ksu_type\`, \`$ksu_ref\`"
+            else
+              ksu_display+="🔀 \`$ksu_type\`, \`$ksu_ref\` (\`$ksu_resolved\`)"
+            fi
+          fi
           
           {
             cat << 'EOF'
@@ -248,14 +375,11 @@ jobs:
           **Devices:** ${{ steps.set-matrix.outputs.count }}  
           
           **Configuration:**
-          - KSU Config: `
           EOF
           
-            # Inject the shell variable
-            printf '%s' "$ksu_options_normalized"
+            echo "- KSU Config: $ksu_display"
           
             cat << 'EOF'
-          `
           - Optimization: ${{ inputs.optimize_level }}
           - Clean Build/No Ccache: ${{ inputs.clean_build && '✅ Yes' || '❌ No' }}
           
@@ -263,19 +387,23 @@ jobs:
           EOF
           } >> "$GITHUB_STEP_SUMMARY"
           
+          susfs_input="${{ inputs.susfs_branch_or_commit }}"
+          susfs_resolved="${{ steps.set-matrix.outputs.susfs_resolved_hash }}"
           matrix_json='${{ steps.set-matrix.outputs.matrix }}'
           android_ver=$(echo "$matrix_json" | jq -r '.include[0].android_version')
-          kernel_ver=$(echo "$matrix_json" | jq -r '.include[0].kernel_version')
+          kernel_ver=$(echo "$matrix_json"  | jq -r '.include[0].kernel_version')
           key="${android_ver}-${kernel_ver}"
           
-          if [ -z "${{ inputs.susfs_branch_or_commit }}" ]; then
-            echo "- SusFS Commit Hash: 🔄 auto (\`gki-$key\`)" >> $GITHUB_STEP_SUMMARY
+          if [ -z "$susfs_input" ]; then
+            echo "- $key: 🔄 auto (\`$susfs_resolved\`)" >> $GITHUB_STEP_SUMMARY
+          elif [[ "$susfs_input" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "- $key: 📌 \`$susfs_input\`" >> $GITHUB_STEP_SUMMARY
           else
-            echo "- SusFS Commit Hash:: 📌 \`${{ inputs.susfs_branch_or_commit }}\`" >> $GITHUB_STEP_SUMMARY
+            echo "- $key: 🔀 \`$susfs_input\` (\`$susfs_resolved\`)" >> $GITHUB_STEP_SUMMARY
           fi
           
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "> **💡 Note:** Empty values auto-map to matching \`gki-androidX-Y.Z\` branches." >> $GITHUB_STEP_SUMMARY
+          echo "> **💡 Note:** Hashes are resolved at run time via API calls before builds start." >> $GITHUB_STEP_SUMMARY
           
           # Add OOS restriction note for android-kernel filters
           if [[ "${{ inputs.op_model }}" == android*-*.* ]]; then
@@ -325,50 +453,6 @@ jobs:
           chmod +x util_free_space.sh
           ./util_free_space.sh
 
-      - name: 🔍 Resolve SUSFS branch from inputs
-        id: susfs
-        shell: bash
-        if: ${{ matrix.susfs }}
-        run: |
-          set -euo pipefail
-          
-          key="${{ matrix.android_version }}-${{ matrix.kernel_version }}"
-          
-          echo "Looking up SUSFS branch for: $key"
-          
-          # Map kernel version to input value
-          case "$key" in
-            "android12-5.10")
-              susfs_branch="${{ inputs.susfs_branch_or_commit }}"
-              ;;
-            "android13-5.15")
-              susfs_branch="${{ inputs.susfs_branch_or_commit }}"
-              ;;
-            "android14-6.1")
-              susfs_branch="${{ inputs.susfs_branch_or_commit }}"
-              ;;
-            "android15-6.6")
-              susfs_branch="${{ inputs.susfs_branch_or_commit }}"
-              ;;
-            "android16-6.12")
-              susfs_branch="${{ inputs.susfs_branch_or_commit }}"
-              ;;
-            *)
-              echo "::error::Unsupported kernel version: $key"
-              exit 1
-              ;;
-          esac
-          
-          # If empty, it will be auto-resolved to gki-* branch in the action
-          if [ -z "$susfs_branch" ]; then
-            echo "ℹ️  No custom SUSFS branch specified for $key"
-            echo "   Will auto-select: gki-$key"
-          else
-            echo "✅ Using custom SUSFS branch for $key: '$susfs_branch'"
-          fi
-          
-          echo "susfs_branch=$susfs_branch" >> "$GITHUB_OUTPUT"
-
       - name: Install Minimal Dependencies
         run: |
           set -euo pipefail
@@ -406,7 +490,7 @@ jobs:
         id: prepare_config
         shell: bash
         run: |
-          echo "config_json=$(jq -nc --argjson m '${{ toJSON(matrix) }}' '$m | del(.ksu_type, .ksu_hash)')" >> "$GITHUB_OUTPUT"
+          echo "config_json=$(jq -nc --argjson m '${{ toJSON(matrix) }}' '$m | del(.ksu_type, .ksu_hash, .ksu_resolved_hash, .susfs_resolved_hash)')" >> "$GITHUB_OUTPUT"
 
       - name: 📥 Checkout Code (to access manifests/)
         uses: actions/checkout@v6
@@ -423,8 +507,8 @@ jobs:
         with:
           op_config_json: ${{ steps.prepare_config.outputs.config_json }}
           ksu_type: ${{ matrix.ksu_type }}
-          ksu_branch_or_hash: ${{ matrix.ksu_hash }}
-          susfs_commit_hash_or_branch: ${{ steps.susfs.outputs.susfs_branch }}
+          ksu_branch_or_hash: ${{ matrix.ksu_resolved_hash }}
+          susfs_commit_hash_or_branch: ${{ matrix.susfs_resolved_hash }}
           optimize_level: ${{ inputs.optimize_level }}
           clean: ${{ inputs.clean_build }}
 
@@ -438,7 +522,7 @@ jobs:
           echo "OS Version: ${{ matrix.os_version }}"
           echo "Kernel: ${{ matrix.android_version }}-${{ matrix.kernel_version }}"
           if [ "${{ matrix.susfs }}" = true ]; then
-            echo "SUSFS Branch: ${{ steps.susfs.outputs.susfs_branch }}"
+            echo "SUSFS Hash: ${{ matrix.susfs_resolved_hash }}"
           fi
           echo "Status: ${{ job.status }}"
           
@@ -490,7 +574,7 @@ jobs:
           
           if [ "${{ matrix.susfs }}" = true ]; then
             cat >> $GITHUB_STEP_SUMMARY << EOF
-          **SUSFS Branch:** \`${{ steps.susfs.outputs.susfs_branch || format('(auto: gki-{0}-{1})', matrix.android_version, matrix.kernel_version) }}\`
+          **SUSFS Hash:** \`${{ matrix.susfs_resolved_hash }}\`
           EOF
           fi
           
