@@ -131,6 +131,7 @@ jobs:
       ksu_resolved_hash:    ${{ steps.set-matrix.outputs.ksu_resolved_hash }}
       ksu_options_normalized: ${{ steps.set-matrix.outputs.ksu_options_normalized }}
       susfs_resolved_hash:  ${{ steps.set-matrix.outputs.susfs_resolved_hash }}
+      susfs_base_version: ${{ steps.set-matrix.outputs.susfs_base_version }}
     steps:
       - name: 📥 Checkout Code (to access configs/)
         uses: actions/checkout@v6
@@ -294,9 +295,9 @@ jobs:
             RETRY_COUNT=0
             RETRY_DELAY=5
             susfs_resolved=""
+            susfs_base_version="unknown"
             
             until [ $RETRY_COUNT -ge $MAX_RETRIES ]; do
-              # We query the commit endpoint which accepts Branch, Tag, or SHA
               RESULT=$(curl -s --fail \
                 "https://gitlab.com/api/v4/projects/${PROJECT_ID}/repository/commits/${susfs_ref}")
               EXIT_CODE=$?
@@ -304,6 +305,27 @@ jobs:
               if [ $EXIT_CODE -eq 0 ] && [ -n "$RESULT" ]; then
                 susfs_resolved=$(echo "$RESULT" | jq -r '.id')
                 echo "  ✅ Resolved: $susfs_key → $susfs_resolved"
+                
+                # Single loop: fetch SUSFS_VERSION from susfs.h using same ref
+                VER_RETRY=0
+                VER_MAX_RETRIES=3
+                VER_RETRY_DELAY=5
+                until [ $VER_RETRY -ge $VER_MAX_RETRIES ]; do
+                  RAW_CONTENT=$(curl -s --fail \
+                    "https://gitlab.com/api/v4/projects/${PROJECT_ID}/repository/files/kernel_patches%2Finclude%2Flinux%2Fsusfs.h/raw?ref=${susfs_ref}")
+                  if [ $? -eq 0 ] && [ -n "$RAW_CONTENT" ]; then
+                    extracted=$(echo "$RAW_CONTENT" | grep '#define SUSFS_VERSION' | awk -F'"' '{print $2}')
+                    if [ -n "$extracted" ]; then
+                      susfs_base_version="$extracted"
+                      echo "  ✅ SUSFS_VERSION = $susfs_base_version"
+                      break
+                    fi
+                  fi
+                  VER_RETRY=$((VER_RETRY + 1))
+                  echo "::warning::Failed to fetch susfs.h (Attempt $VER_RETRY/$VER_MAX_RETRIES). Retrying in ${VER_RETRY_DELAY}s..."
+                  sleep $VER_RETRY_DELAY
+                done
+                
                 break
               fi
               
@@ -312,17 +334,24 @@ jobs:
               sleep $RETRY_DELAY
             done
             
-            # Final Validation
+            # Final Validation — SUSFS hash
             if [ -z "$susfs_resolved" ] || [ "$susfs_resolved" = "null" ]; then
               echo "::error::Could not resolve SUSFS ref '$susfs_ref' for $susfs_key on GitLab."
               exit 1
             fi
+            
+            # Final Validation — SUSFS version
+            if [ "$susfs_base_version" = "unknown" ]; then
+              echo "::warning::Could not extract SUSFS_VERSION from susfs.h after $VER_MAX_RETRIES attempts."
+            fi
           else
             susfs_resolved="unknown"
+            susfs_base_version="unknown"
             echo "ℹ️  SUSFS disabled for this device, skipping resolution"
           fi
           
           echo "susfs_resolved_hash=$susfs_resolved" >> "$GITHUB_OUTPUT"
+          echo "susfs_base_version=$susfs_base_version" >> "$GITHUB_OUTPUT"
           
           # Inject susfs_resolved_hash into matrix
           merged_matrix=$(echo "$merged_matrix" | jq \
