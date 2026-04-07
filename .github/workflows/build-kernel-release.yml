@@ -131,7 +131,6 @@ jobs:
       ksu_resolved_hash:    ${{ steps.set-matrix.outputs.ksu_resolved_hash }}
       ksu_options_normalized: ${{ steps.set-matrix.outputs.ksu_options_normalized }}
       susfs_resolved_hash:  ${{ steps.set-matrix.outputs.susfs_resolved_hash }}
-      susfs_base_version: ${{ steps.set-matrix.outputs.susfs_base_version }}
     steps:
       - name: 📥 Checkout Code (to access configs/)
         uses: actions/checkout@v6
@@ -268,8 +267,7 @@ jobs:
           merged_matrix=$(echo "$merged_matrix" | jq --arg resolved_sha "$resolved_sha" 'map(.ksu_resolved_hash = $resolved_sha)')
           
           # SUSFS hash fetch
-          SUSFS_REPO="https://gitlab.com/simonpunk/susfs4ksu.git"
-          PROJECT_ID="simonpunk%2fsusfs4ksu"
+          GITLAB_PROJECT_PATH="simonpunk/susfs4ksu"
           android_ver=$(echo "$merged_matrix" | jq -r '.[0].android_version')
           kernel_ver=$(echo "$merged_matrix"  | jq -r '.[0].kernel_version')
           susfs_key="${android_ver}-${kernel_ver}"
@@ -289,48 +287,30 @@ jobs:
           susfs_enabled=$(echo "$merged_matrix" | jq -r '.[0].susfs')
           
           if [ "$susfs_enabled" = "true" ]; then
-            echo "🔍 Resolving SUSFS hash for: $susfs_key (ref: $susfs_ref)"
+            echo "🔍 Resolving SUSFS hash and version for: $susfs_key (ref: $susfs_ref)"
             
+            # Single GraphQL query: fetch commit SHA
+            GL_QUERY="{ project(fullPath: \"${GITLAB_PROJECT_PATH}\") { repository { ch: commit(ref: \"${susfs_ref}\") { sha } } } }"
+
             MAX_RETRIES=3
             RETRY_COUNT=0
             RETRY_DELAY=5
             susfs_resolved=""
-            susfs_base_version="unknown"
             
             until [ $RETRY_COUNT -ge $MAX_RETRIES ]; do
-              RESULT=$(curl -s --fail \
-                "https://gitlab.com/api/v4/projects/${PROJECT_ID}/repository/commits/${susfs_ref}")
+              RESPONSE=$(curl -s --fail -G "https://gitlab.com/api/graphql" --data-urlencode "query=$GL_QUERY")
               EXIT_CODE=$?
               
-              if [ $EXIT_CODE -eq 0 ] && [ -n "$RESULT" ]; then
-                susfs_resolved=$(echo "$RESULT" | jq -r '.id')
-                echo "  ✅ Resolved: $susfs_key → $susfs_resolved"
-                
-                # Single loop: fetch SUSFS_VERSION from susfs.h using same ref
-                VER_RETRY=0
-                VER_MAX_RETRIES=3
-                VER_RETRY_DELAY=5
-                until [ $VER_RETRY -ge $VER_MAX_RETRIES ]; do
-                  RAW_CONTENT=$(curl -s --fail \
-                    "https://gitlab.com/api/v4/projects/${PROJECT_ID}/repository/files/kernel_patches%2Finclude%2Flinux%2Fsusfs.h/raw?ref=${susfs_ref}")
-                  if [ $? -eq 0 ] && [ -n "$RAW_CONTENT" ]; then
-                    extracted=$(echo "$RAW_CONTENT" | grep '#define SUSFS_VERSION' | awk -F'"' '{print $2}')
-                    if [ -n "$extracted" ]; then
-                      susfs_base_version="$extracted"
-                      echo "  ✅ SUSFS_VERSION = $susfs_base_version"
-                      break
-                    fi
-                  fi
-                  VER_RETRY=$((VER_RETRY + 1))
-                  echo "::warning::Failed to fetch susfs.h (Attempt $VER_RETRY/$VER_MAX_RETRIES). Retrying in ${VER_RETRY_DELAY}s..."
-                  sleep $VER_RETRY_DELAY
-                done
-                
-                break
+              if [ $EXIT_CODE -eq 0 ] && [ -n "$RESPONSE" ]; then
+                susfs_resolved=$(echo "$RESPONSE" | jq -r '.data.project.repository.ch.sha // empty')
+                if [ -n "$susfs_resolved" ] && [ "$susfs_resolved" != "null" ]; then
+                  echo "  ✅ Resolved: $susfs_key → $susfs_resolved"
+                  break
+                fi
               fi
               
               RETRY_COUNT=$((RETRY_COUNT + 1))
-              echo "::warning::GitLab API failed (Attempt $RETRY_COUNT/$MAX_RETRIES). Retrying..."
+              echo "::warning::GitLab GraphQL API failed (Attempt $RETRY_COUNT/$MAX_RETRIES). Retrying..."
               sleep $RETRY_DELAY
             done
             
@@ -339,19 +319,12 @@ jobs:
               echo "::error::Could not resolve SUSFS ref '$susfs_ref' for $susfs_key on GitLab."
               exit 1
             fi
-            
-            # Final Validation — SUSFS version
-            if [ "$susfs_base_version" = "unknown" ]; then
-              echo "::warning::Could not extract SUSFS_VERSION from susfs.h after $VER_MAX_RETRIES attempts."
-            fi
           else
             susfs_resolved="unknown"
-            susfs_base_version="unknown"
             echo "ℹ️  SUSFS disabled for this device, skipping resolution"
           fi
           
           echo "susfs_resolved_hash=$susfs_resolved" >> "$GITHUB_OUTPUT"
-          echo "susfs_base_version=$susfs_base_version" >> "$GITHUB_OUTPUT"
           
           # Inject susfs_resolved_hash into matrix
           merged_matrix=$(echo "$merged_matrix" | jq \
