@@ -287,7 +287,7 @@ jobs:
           susfs_enabled=$(echo "$merged_matrix" | jq -r '.[0].susfs')
           
           if [ "$susfs_enabled" = "true" ]; then
-            echo "🔍 Resolving SUSFS hash and version for: $susfs_key (ref: $susfs_ref)"
+            echo "🔍 Resolving SUSFS hash for: $susfs_key (ref: $susfs_ref)"
             
             # Single GraphQL query: fetch commit SHA
             GL_QUERY="{ project(fullPath: \"${GITLAB_PROJECT_PATH}\") { repository { ch: commit(ref: \"${susfs_ref}\") { sha } } } }"
