@@ -117,6 +117,10 @@ on:
         description: 'Clean build (no ccache)'
         type: boolean
         default: false
+      build_timestamp:
+        description: 'Custom kernel build timestamp for uname -a (e.g. "Tue Feb 10 10:01:02 UTC 2026"). Leave empty for current time.'
+        type: string
+        default: ''
       susfs_branch_or_commit:
         description: 'Enter SusFS Branch or commit hash for selected device kernel'
         type: string
@@ -360,6 +364,13 @@ jobs:
             fi
           fi
           
+          build_ts_input="${{ inputs.build_timestamp }}"
+          if [ -z "$build_ts_input" ]; then
+            build_ts_display="⏱️ auto (current build time)"
+          else
+            build_ts_display="📌 \`$build_ts_input\`"
+          fi
+
           {
             cat << 'EOF'
           ## 🎯 Build Plan
@@ -371,6 +382,7 @@ jobs:
           EOF
           
             echo "- KSU Config: $ksu_display"
+            echo "- Build Timestamp: $build_ts_display"
           
             cat << 'EOF'
           - Optimization: ${{ inputs.optimize_level }}
@@ -503,6 +515,7 @@ jobs:
           ksu_branch_or_hash: ${{ matrix.ksu_resolved_hash }}
           susfs_commit_hash_or_branch: ${{ matrix.susfs_resolved_hash }}
           optimize_level: ${{ inputs.optimize_level }}
+          build_timestamp: ${{ inputs.build_timestamp }}
           clean: ${{ inputs.clean_build }}
 
       - name: 📊 Build statistics
