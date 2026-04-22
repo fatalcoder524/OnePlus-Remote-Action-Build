@@ -43,6 +43,13 @@ jobs:
             configs/
           sparse-checkout-cone-mode: false
 
+      - name: Fetch manifests from main repo
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -sSfL https://github.com/WildKernels/OnePlus_KernelSU_SUSFS/archive/refs/heads/main.tar.gz \
+            | tar xz --wildcards '*/manifests/*' --strip-components=1
+
       - name: Generate Mirror Matrix
         id: generate-config
         shell: bash
