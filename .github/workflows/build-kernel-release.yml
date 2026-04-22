@@ -437,7 +437,10 @@ jobs:
   build:
     name: build (${{ matrix.model }}, ${{ matrix.soc }}, ${{ matrix.branch }}, ${{ matrix.manifest }}, ${{ matrix.android_version }}, ${{ matrix.kernel_version }}, ${{ matrix.os_version }}, ${{ matrix.ksu_type }})
     needs: [set-op-model, mirror_toolchain]
-    if: always() && needs.set-op-model.result == 'success' && (needs.mirror_toolchain.result == 'success' || needs.mirror_toolchain.result == 'skipped')
+    if: |
+      !cancelled() &&
+      needs.set-op-model.result == 'success' &&
+      (needs.mirror_toolchain.result == 'success' || needs.mirror_toolchain.result == 'skipped')
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
