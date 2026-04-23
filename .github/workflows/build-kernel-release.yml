@@ -502,16 +502,46 @@ jobs:
           echo "::endgroup::"
 
       - name: ♻️ Configure ccache (bounded)
-        if: ${{ inputs.clean_build != true }}
         run: |
+          echo "::group::Configure ccache environment"
+          set -euo pipefail
           if command -v ccache >/dev/null 2>&1; then
-            echo "::group::ccache configuration"
-            ccache -o max_size=1.0G
-            ccache -o compression=true
-            ccache -o compression_level=3
-            ccache -s
-            echo "::endgroup::"
+            CACHE_DIR="${{ github.workspace }}/.ccache"
+            mkdir -p "$CACHE_DIR"
+            
+            SETTINGS=(
+              "CCACHE_DIR=$CACHE_DIR"
+              "CCACHE_MAXSIZE=1G"
+              "CCACHE_COMPILERCHECK=content"
+              "CCACHE_BASEDIR=${GITHUB_WORKSPACE}"
+              "CCACHE_NOHASHDIR=true"
+              "CCACHE_IGNOREOPTIONS=--sysroot*"
+              "CCACHE_COMPRESSION=true"
+              "CCACHE_COMPRESSION_LEVEL=3"
+              "CCACHE_DIRECT=true"
+              "CCACHE_FILE_CLONE=true"
+              "CCACHE_INODE_CACHE=true"
+              "CCACHE_UMASK=002"
+              "CCACHE_SLOPPINESS=file_macro,time_macros,include_file_mtime,include_file_ctime,pch_defines,system_headers,locale"
+            )
+            
+            for setting in "${SETTINGS[@]}"; do
+              export "$setting"
+              echo "$setting" >> "$GITHUB_ENV"
+            done
+            
+            if ccache --help 2>&1 | grep -q 'depend_mode'; then
+              export CCACHE_DEPEND=true
+              echo "CCACHE_DEPEND=true" >> "$GITHUB_ENV"
+            fi
+            
+            echo "✅ ccache configured successfully"
+            echo "Current ccache configuration:"
+            ccache -p
+          else
+            echo "ccache not found, skipping configuration."
           fi
+          echo "::endgroup::"
 
       - name: 🧹 Prepare op_config_json (without KSU fields)
         id: prepare_config
