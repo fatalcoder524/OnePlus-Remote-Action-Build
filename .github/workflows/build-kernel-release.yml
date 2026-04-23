@@ -556,11 +556,12 @@ jobs:
           ref: main
           sparse-checkout: |
             manifests/
+            .github/actions/
           sparse-checkout-cone-mode: false
 
       - name: 🔨 Build Kernel
         id: build
-        uses: WildKernels/OnePlus_KernelSU_SUSFS/.github/actions/build-kernel@main
+        uses: ./.github/actions/build-kernel
         with:
           op_config_json: ${{ steps.prepare_config.outputs.config_json }}
           ksu_type: ${{ matrix.ksu_type }}
