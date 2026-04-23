@@ -511,7 +511,7 @@ jobs:
             
             SETTINGS=(
               "CCACHE_DIR=$CACHE_DIR"
-              "CCACHE_MAXSIZE=1G"
+              "CCACHE_MAXSIZE=0"
               "CCACHE_COMPILERCHECK=content"
               "CCACHE_BASEDIR=${GITHUB_WORKSPACE}"
               "CCACHE_NOHASHDIR=true"
