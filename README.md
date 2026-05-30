@@ -25,7 +25,7 @@ Build OnePlus latest kernel for your device with KSUN/WildKSU/KSU + SusFS anytim
 | OP-NORD-4 | |✅|✅|
 | OP-NORD-4-CE | |✅|✅|
 | OP-NORD-CE4-LITE | |✅|✅|
-| OP-NORD-3 | |✅| |
+| OP-NORD-3 |✅|✅| |
 | OP-NORD-N30-SE | |✅| |
 | OP-TURBO-6V | | |✅|
 | OP-TURBO-6 | | |✅|
@@ -39,7 +39,7 @@ Build OnePlus latest kernel for your device with KSUN/WildKSU/KSU + SusFS anytim
 | OP-ACE-3V | |✅|✅|
 | OP-ACE-3 | |✅|✅|
 | OP-ACE-2-PRO | |✅|✅|
-| OP-ACE-2V | |✅| |
+| OP-ACE-2V |✅|✅|✅|
 | OP-ACE-2 | |✅|✅|
 | OP-ACE-RACE |✅|✅| |
 | OP-ACE |✅|✅| |
@@ -50,6 +50,7 @@ Build OnePlus latest kernel for your device with KSUN/WildKSU/KSU + SusFS anytim
 | OP-PAD-2-SM8650 | |✅|✅|
 | OP-PAD-2-MT6991 | | |✅|
 | OP-PAD-PRO |✅|✅|✅|
-| OP-PAD-MT6983 | |✅|✅|
+| OP-PAD-MT6983 |✅|✅|✅|
 | OP-PAD-LITE | |✅| |
 | OP-PAD-GO-2 | | |✅|
+| OP-PAD-GO |✅| | |
