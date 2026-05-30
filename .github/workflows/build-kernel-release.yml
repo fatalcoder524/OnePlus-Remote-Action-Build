@@ -37,6 +37,7 @@ on:
           - OP-ACE-3V_oos16
           - OP-ACE-3_oos16
           - OP-ACE-2-PRO_oos16
+          - OP-ACE-2V_oos16
           - OP-ACE-2_oos16
           - OP-NORD-6_oos16
           - OP-NORD-5_oos16
@@ -100,9 +101,13 @@ on:
           - OP10pro_oos14
           - OP10r_oos14
           - OP-ACE-3-PRO_oos14
+          - OP-ACE-2V_oos14
           - OP-ACE-RACE_oos14
           - OP-ACE_oos14
+          - OP-NORD-3_oos14
           - OP-PAD-PRO_oos14
+          - OP-PAD-MT6983_oos14
+          - OP-PAD-GO_oos14
         default: OP11_oos16
       ksu_options:
         description: 'Enter KernelSU build json'

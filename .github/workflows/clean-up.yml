@@ -82,6 +82,7 @@ on:
           - OP-PAD-MT6983
           - OP-PAD-LITE
           - OP-PAD-GO-2
+          - OP-PAD-GO
       
       cache_pattern:
         type: choice
