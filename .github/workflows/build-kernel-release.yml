@@ -18,6 +18,7 @@ on:
           - OP15_oos16
           - OP13_oos16
           - OP13r_oos16
+          - OP13r-6.1.118_oos16
           - OP13S_oos16
           - OP13T_oos16
           - OP12_oos16
