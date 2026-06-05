@@ -31,6 +31,7 @@ Build OnePlus latest kernel for your device with KSUN/WildKSU/KSU + SusFS anytim
 | OP-TURBO-6 | | |✅|
 | OP-ACE-6T | | |✅|
 | OP-ACE-6 | | |✅|
+| OP-ACE-6-ULTRA | | |✅|
 | OP-ACE-5-PRO | |✅|✅|
 | OP-ACE-5 | |✅|✅|
 | OP-ACE-5-ULTRA | |✅|✅|
