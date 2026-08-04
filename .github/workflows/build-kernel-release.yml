@@ -17,10 +17,12 @@ on:
           - OP15r_a16
           - OP15_a16
           - OP13_a16
+          - OP13-6.6.89_a16
           - OP13r_a16
           - OP13r-6.1.118_a16
           - OP13S_a16
           - OP13T_a16
+          - OP13T-6.6.89_a16
           - OP12_a16
           - OP12-6.1.118_a16
           - OP12r_a16
@@ -29,17 +31,23 @@ on:
           - OP11-5.15.167_a16
           - OP11r_a16
           - OP10pro_a16
+          - OP-TURBO-6X_a16
           - OP-TURBO-6V_a16
+          - OP-TURBO-6V-6.1.118_a16
           - OP-TURBO-6_a16
           - OP-ACE-6T_a16
           - OP-ACE-6_a16
+          - OP-ACE-6-6.6.89_a16
           - OP-ACE-6-ULTRA_a16
           - OP-ACE-5-PRO_a16
+          - OP-ACE-5-PRO-6.6.89_a16
           - OP-ACE-5_a16
           - OP-ACE-5-6.1.118_a16
           - OP-ACE-5-ULTRA_a16
+          - OP-ACE-5-ULTRA-6.6.89_a16
           - OP-ACE-5-RACE_a16
           - OP-ACE-3-PRO_a16
+          - OP-ACE-3-PRO-6.1.118_a16
           - OP-ACE-3V_a16
           - OP-ACE-3V-6.1.118_a16
           - OP-ACE-3_a16
@@ -47,6 +55,8 @@ on:
           - OP-ACE-2-PRO_a16
           - OP-ACE-2V_a16
           - OP-ACE-2_a16
+          - OP-N6_a16
+          - OP-NORD-CE6-LITE_a16
           - OP-NORD-6_a16
           - OP-NORD-5_a16
           - OP-NORD-5-6.1.118_a16
@@ -56,11 +66,14 @@ on:
           - OP-NORD-4-CE_a16
           - OP-NORD-CE4-LITE_a16
           - OP-NORD-CE4-LITE-6.1.118_a16
+          - OP-NORD-3_a16
           - OP-PAD-4_a16
           - OP-PAD-3-PRO_a16
           - OP-PAD-3-SM8750_a16
+          - OP-PAD-3-SM8750-6.6.89_a16
           - OP-PAD-3-MT6897_a16
           - OP-PAD-2-PRO_a16
+          - OP-PAD-2-PRO-6.6.89_a16
           - OP-PAD-2-MT6991_a16
           - OP-PAD-2-SM8650_a16
           - OP-PAD-PRO_a16
@@ -263,8 +276,13 @@ jobs:
           fi
           
           echo "$filtered" | jq '.' > matrix.json
-          
-          merged_matrix=$(jq -n --argjson devices "$filtered" --argjson ksu_list "$ksu_options_normalized" '[ $devices[] as $dev | $ksu_list[] as $ksu | ($dev + {ksu_type: $ksu.type, ksu_hash: $ksu.hash}) ]')
+          echo "$ksu_options_normalized" > ksu_temp.json
+
+          merged_matrix=$(jq -n \
+            --slurpfile devices matrix.json \
+            --slurpfile ksu_list ksu_temp.json \
+            '[ $devices[0][] as $dev | $ksu_list[0][] as $ksu | ($dev + {ksu_type: $ksu.type, ksu_hash: $ksu.hash}) ]')
+          rm ksu_temp.json
           
           final_count=$(echo "$merged_matrix" | jq -s length)
           
@@ -401,9 +419,12 @@ jobs:
             --arg susfs_resolved "$susfs_resolved" \
             'map(.susfs_resolved_hash = $susfs_resolved)')
           
+          echo "$merged_matrix" > final_matrix_temp.json
+
           # Recalculate wrapped with updated matrix and write output
-          wrapped=$(jq -n --argjson items "$merged_matrix" '{ include: $items }')
+          wrapped=$(jq --slurp '{ include: .[] }' final_matrix_temp.json)
           echo "matrix=$(jq -c . <<< "$wrapped")" >> "$GITHUB_OUTPUT"
+          rm final_matrix_temp.json
           
           echo "::endgroup::"
 
