@@ -20,6 +20,7 @@ on:
           - OP13-6.6.89_a16
           - OP13r_a16
           - OP13r-6.1.118_a16
+          - OP13r-6.1.141_a16
           - OP13S_a16
           - OP13S-6.6.89_a16
           - OP13T_a16
@@ -195,6 +196,11 @@ on:
         type: choice
         options: [O2, O3]
         default: O2
+      mlgo:
+        description: 'Do you want to enable mlgo? [Machine Learning Guided Optimization]'
+        required: false
+        type: boolean
+        default: true
       clean_build:
         description: 'Clean build (no ccache)'
         type: boolean
@@ -486,6 +492,7 @@ jobs:
           
             cat << 'EOF'
           - Optimization: ${{ inputs.optimize_level }}
+          - MLGO: ${{ inputs.mlgo }}
           - Clean Build/No Ccache: ${{ inputs.clean_build && '✅ Yes' || '❌ No' }}
           - Create Debug Artifacts: ${{ inputs.debug && '✅ Yes' || '❌ No' }}
           - Sync toolchains: ${{ inputs.mirror_toolchains && '✅ Yes' || '❌ No' }}
@@ -683,6 +690,7 @@ jobs:
           ksu_branch_or_hash: ${{ matrix.ksu_resolved_hash }}
           susfs_commit_hash_or_branch: ${{ matrix.susfs_resolved_hash }}
           optimize_level: ${{ inputs.optimize_level }}
+          mlgo: ${{ inputs.mlgo }}
           build_timestamp: ${{ inputs.build_timestamp }}
           clean: ${{ inputs.clean_build }}
           debug: ${{ inputs.debug }}
