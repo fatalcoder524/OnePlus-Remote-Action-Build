@@ -21,12 +21,17 @@ Build OnePlus latest kernel for your device with KSUN/WildKSU/KSU + SusFS anytim
 | OP10r |✅|✅| |
 | OP-NORD-6 | | |✅|
 | OP-NORD-5 | |✅|✅|
+| OP-NORD-CE6 | | |✅|
+| OP-NORD-CE6-LITE | | |✅|
 | OP-NORD-CE-5 | |✅|✅|
 | OP-NORD-4 | |✅|✅|
 | OP-NORD-4-CE | |✅|✅|
 | OP-NORD-CE4-LITE | |✅|✅|
-| OP-NORD-3 |✅|✅| |
+| OP-NORD-3 |✅|✅|✅|
 | OP-NORD-N30-SE | |✅| |
+| OP-N6 | | |✅|
+| OP-N6X | | |✅|
+| OP-TURBO-6X | | |✅|
 | OP-TURBO-6V | | |✅|
 | OP-TURBO-6 | | |✅|
 | OP-ACE-6T | | |✅|
