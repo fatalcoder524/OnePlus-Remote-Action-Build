@@ -237,7 +237,7 @@ jobs:
       - name: 📥 Checkout Code (to access configs/)
         uses: actions/checkout@v6
         with:
-          ref: devices
+          ref: turbo6v-debug-devices
           sparse-checkout: |
             configs/
           sparse-checkout-cone-mode: false
